@@ -32,7 +32,7 @@ bool read_sudoku(char *filename, int(&sudoku_field)[8][8]) {
 
 	if (infile.good()) {
 		char buffer[512];
-		int intcol = 0, introw = 0;
+		int field_col = 0, field_row = 0, file_row = 0;
 
 		do {
 			infile.getline(buffer, 512);
@@ -41,35 +41,54 @@ bool read_sudoku(char *filename, int(&sudoku_field)[8][8]) {
 				//skip_whitespaces
 				while (*pom && (*pom == ' ' || *pom == '\t'))
 					pom++;
-				while (*pom && intcol < 8) {
+				if (*pom == '#')
+				{
+					file_row++;
+					continue;
+				}
+				while (*pom && field_col < 8) {
 					//cout << *pom << endl;
 					if (*pom >= '1' && *pom <= '9') {
-						sudoku_field[introw][intcol++] = (*pom - '0');
+						sudoku_field[field_row][field_col++] = (*pom - '0');
 					}
 					else {
 						if (*pom == '.')
-							sudoku_field[introw][intcol++] = 0;
+							sudoku_field[field_row][field_col++] = 0;
 						else {
-							error_place(std::cerr, buffer, pom);
-							std::cerr << "Unknown character '" << *pom << "'." << std::endl;
-							infile.close();
-							return false;
+							if (*pom == '#')
+								break;
+							else
+							{
+								if (*pom == ' ' || *pom == '\t')
+								{
+									// ignore white space characters
+								}
+								else
+								{
+									error_place(std::cerr, buffer, pom);
+									std::cerr << "Unknown character '" << *pom << "'." << std::endl;
+									infile.close();
+									return false;
+								}
+							}
 
 						}
 					}
 					pom++;
 				}
-				if (intcol != 8)
+				if (field_col != 8)
 				{
-					std::cerr << "Incorrect number of character on row no. " << (introw + 1) << '\n';
+					std::cerr << "Incorrect number of character on row no. " << (file_row + 1) << '\n';
+					std::cerr << buffer;
 					infile.close();
 					return false;
 				}
-				intcol = 0;
-				introw++;
+				field_col = 0;
+				field_row++;
+				file_row++;
 			}
-		} while (infile.good() && introw < 8);
-		if (introw != 8)
+		} while (infile.good() && field_row < 8);
+		if (field_row != 8)
 		{
 			std::cerr << "Incorrect number of character of rows, expecting 8.\n";
 			infile.close();
@@ -89,10 +108,10 @@ bool read_sudoku(char *filename, int(&sudoku_field)[8][8]) {
 
 
 
-bool can_be_filled(int x, int y, int elem, int(&sudoku)[8][8]) {
+bool can_be_filled(int r, int c, int elem, int(&sudoku)[8][8]) {
 	// check column
 	for (int i = 0; i < 8; i++) {
-		if (sudoku[i][y] == elem) {
+		if (sudoku[i][c] == elem) {
 			//std::cerr << "Row: x:" << x << ", y: " << y << ", elem: " << elem << ", i: " << i << '\n';
 			return false;
 		}
@@ -100,18 +119,18 @@ bool can_be_filled(int x, int y, int elem, int(&sudoku)[8][8]) {
 	
 	//check row
 	for (int i = 0; i < 8; i++) {
-		if (sudoku[x][i] == elem) {
+		if (sudoku[r][i] == elem) {
 			//std::cerr << "Column: x:" << x << ", y: " << y << ", elem: " << elem << ", i: " << i << '\n';;
 			return false;
 		}
 	}
 	
 	// check area
-	int field_idx = fieldmap[x][y];
+	int field_idx = fieldmap[r][c];
 	
-	for (int i = 0; i < 8; i++)
-		for (int j = 0; j < 8; j++)
-			if (fieldmap[i][j] == field_idx && sudoku[i][j] == elem) {		
+	for (int rr = 0; rr < 8; rr++)
+		for (int cc = 0; cc < 8; cc++)
+			if (fieldmap[rr][cc] == field_idx && sudoku[rr][cc] == elem) {		
 				//std::cerr << "Field " << field_idx << ", x:" << x << ", y: " << y << ", elem: " << elem << ", i: " << i << '\n';
 				return false;
 			}
@@ -119,10 +138,22 @@ bool can_be_filled(int x, int y, int elem, int(&sudoku)[8][8]) {
 	return true;
 }
 
+static const char* usage_msg = "\n \
+File syntax: empty field = '.', filled_field = <num>\n \
+\n \
+Table 8x8 of [.[0-9]] characters\n \
+";
+
+// global total number of solutions
+int g_total_num_solutions = 0;
+
+// sets also g_total_num_solutions
 void solve(int x, int y, int(&sudoku)[8][8]) {
 	//std::cout << "x = " << x << ", y = " << y << '\n';
 	
 	if (x >= 8) {
+		g_total_num_solutions++;
+
 		std::cout << "\nSolution:\n";
 		for (int i = 0; i < 8; i++) {
 			for (int j = 0; j < 8; j++)
@@ -160,6 +191,7 @@ int main(int argc, char *argv[])
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] << " <filename>\n";
+		std::cout << usage_msg;
 	}
 	else
 	{
@@ -178,6 +210,10 @@ int main(int argc, char *argv[])
 			}
 			
 			solve(0, 0, sudoku);
+			if (g_total_num_solutions == 0)
+				std::cout << "\nNo solution\n";
+			else
+				std::cout << "\nTotal number of solutions: " << g_total_num_solutions << '\n';
 		}
 	}
 	return 0;
